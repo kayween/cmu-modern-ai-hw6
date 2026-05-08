@@ -1,15 +1,26 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = "==3.10.*"
 # dependencies = [
-#     "marimo>=0.23.5",
+#     "huggingface-hub>=1.14.0",
+#     "marimo>=0.23.3",
 #     "mugrade @ git+https://github.com/locuslab/mugrade.git",
+#     "tiktoken>=0.12.0",
+#     "torch==2.6.*",
 # ]
+#
+# [tool.uv.sources]
+# torch = [{ index = "pytorch-cu124" }]
+#
+# [[tool.uv.index]]
+# name = "pytorch-cu124"
+# url = "https://download.pytorch.org/whl/cu124"
+# explicit = true
 # ///
 
 import marimo
 
 __generated_with = "0.23.5"
-app = marimo.App()
+app = marimo.App(width="medium")
 
 
 @app.cell
@@ -24,6 +35,14 @@ def _():
     import subprocess
 
     return (subprocess,)
+
+
+@app.cell
+def _():
+    import sys
+
+    print(sys.version)
+    return
 
 
 @app.cell(hide_code=True)
@@ -41,44 +60,63 @@ def _(subprocess):
     ### Run this cell to download and install the necessary modules for the homework
     # packages added via marimo's package management: git+https://github.com/locuslab/mugrade.git !pip install --upgrade --no-deps git+https://github.com/locuslab/mugrade.git
     #! wget -nc https://raw.githubusercontent.com/modernaicourse/hw6/refs/heads/main/hw6_tests.py
-    subprocess.call(['wget', '-nc', 'https://raw.githubusercontent.com/modernaicourse/hw6/refs/heads/main/hw6_tests.py'])
+    subprocess.call(
+        [
+            "wget",
+            "-nc",
+            "https://raw.githubusercontent.com/modernaicourse/hw6/refs/heads/main/hw6_tests.py",
+        ]
+    )
 
-    import os
-    import math
-    import mugrade
-    import torch
-    import tiktoken
-    from torch.nn import Module, ModuleList, Parameter, Buffer
-    import json
     import copy
+    import json
+    import math
+    import os
 
+    import mugrade
+    import tiktoken
+    import torch
 
-    from hw6_tests import (test_Linear,
-                           test_Embedding,
-                           test_silu,
-                           test_rms_norm,
-                           test_self_attention,
-                           test_MultiHeadAttentionKVCache,
-                           test_MLP,
-                           test_TransformerBlock,
-                           test_cross_entropy_loss,
-                           test_Adam,
-                           test_LLM,
-                           test_generate,
-                           test_convert_to_chat_format, submit_convert_to_chat_format,
-                           test_pretokenize_chat, submit_pretokenize_chat,
-                           test_get_loss_mask, submit_get_loss_mask,
-                           test_DataLoaderChat, submit_DataLoaderChat,
-                           test_train_llm_chat, submit_train_llm_chat,
-                           test_log_probs, submit_log_probs,
-                           test_softplus, submit_softplus,
-                           test_dpo_loss, submit_dpo_loss,
-                           test_train_dpo, submit_train_dpo,
-                           test_eval_llm_chat, submit_eval_llm_chat,
-                           test_eval_llm_dpo, submit_eval_llm_dpo)
+    from hw6_tests import (
+        submit_convert_to_chat_format,
+        submit_DataLoaderChat,
+        submit_dpo_loss,
+        submit_eval_llm_chat,
+        submit_eval_llm_dpo,
+        submit_get_loss_mask,
+        submit_log_probs,
+        submit_pretokenize_chat,
+        submit_softplus,
+        submit_train_dpo,
+        submit_train_llm_chat,
+        test_Adam,
+        test_convert_to_chat_format,
+        test_cross_entropy_loss,
+        test_DataLoaderChat,
+        test_dpo_loss,
+        test_Embedding,
+        test_eval_llm_chat,
+        test_eval_llm_dpo,
+        test_generate,
+        test_get_loss_mask,
+        test_Linear,
+        test_LLM,
+        test_log_probs,
+        test_MLP,
+        test_MultiHeadAttentionKVCache,
+        test_pretokenize_chat,
+        test_rms_norm,
+        test_self_attention,
+        test_silu,
+        test_softplus,
+        test_train_dpo,
+        test_train_llm_chat,
+        test_TransformerBlock,
+    )
+    from torch.nn import Buffer, Module, ModuleList, Parameter
 
     os.environ["MUGRADE_HW"] = "Homework 6"
-    os.environ["MUGRADE_KEY"] = "" ### Your key here
+    os.environ["MUGRADE_KEY"] = ""  ### Your key here
     return (
         Buffer,
         Module,
@@ -108,7 +146,7 @@ def _(mo):
 def _(Buffer, Module, Parameter, math, mugrade, torch):
     @mugrade.local_tests
     class Linear(Module):
-        """ Linear layer with no bias term.  The parameters of the layer are stored in a .weight Parameter"""
+        """Linear layer with no bias term.  The parameters of the layer are stored in a .weight Parameter"""
 
         def __init__(self, in_dim, out_dim):
             """
@@ -120,7 +158,8 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             """
             super().__init__()  ### BEGIN YOUR CODE
             self.weight = Parameter(torch.randn(out_dim, in_dim) * math.sqrt(2 / in_dim))
-      ### END YOUR CODE
+
+        ### END YOUR CODE
         def forward(self, X):
             """
             Apply the linear layer to one or more input vectors.
@@ -131,10 +170,11 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
                 torch.Tensor[float] (... x out_dim) - transformed tensor
             """
             return X @ self.weight.T
-      ### BEGIN YOUR CODE
+
+
+    ### BEGIN YOUR CODE
     @mugrade.local_tests
     class Embedding(Module):  ### END YOUR CODE
-
         def __init__(self, num_tokens, dim):
             """
             Initialize an embedding table over a fixed vocabulary.
@@ -147,15 +187,16 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             self.weight = Parameter(torch.randn(num_tokens, dim))
 
         def forward(self, Y):
-            """  ### BEGIN YOUR CODE
-            Look up embeddings for an integer tensor of token ids.
-      ### END YOUR CODE
-            Input:
-                Y : torch.Tensor[int] (...) - tensor of token indices in [0, num_tokens)
-            Output:
-                torch.Tensor[float] (... x dim) - embedding vectors for each token id
+            """### BEGIN YOUR CODE
+                  Look up embeddings for an integer tensor of token ids.
+            ### END YOUR CODE
+                  Input:
+                      Y : torch.Tensor[int] (...) - tensor of token indices in [0, num_tokens)
+                  Output:
+                      torch.Tensor[float] (... x dim) - embedding vectors for each token id
             """
             return self.weight[Y, :]
+
 
     @mugrade.local_tests
     def silu(x):
@@ -168,6 +209,7 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             torch.Tensor[float] (...) - tensor after applying SiLU
         """
         return x * torch.sigmoid(x)
+
 
     @mugrade.local_tests
     def rms_norm(X, eps=1e-05):
@@ -182,6 +224,7 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
         """
         return X / X.square().mean(dim=-1, keepdim=True).add(eps).sqrt()
 
+
     @mugrade.local_tests
     def self_attention(Q, K, V, mask=None):
         d = Q.shape[-1]
@@ -190,9 +233,9 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             dot_product = dot_product + mask
         return torch.softmax(dot_product, dim=-1) @ V
 
+
     @mugrade.local_tests
     class MultiHeadAttentionKVCache(Module):  ### BEGIN YOUR CODE
-
         def __init__(self, dim, n_heads, max_cache_size):  ### END YOUR CODE
             """
             Initialize a multi-head self-attention layer with KV cache buffers.
@@ -233,19 +276,29 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
                 batch_shape = tensor.shape[:-2]
                 seq_len = tensor.shape[-2]
                 dim = tensor.shape[-1]
-                return tensor.reshape(*batch_shape, seq_len, self.n_heads, dim // self.n_heads).transpose(-2, -3)  ### END YOUR CODE
+                return tensor.reshape(
+                    *batch_shape, seq_len, self.n_heads, dim // self.n_heads
+                ).transpose(-2, -3)  ### END YOUR CODE
+
             if use_kv_cache:
-                self.k_cache[:, seq_pos:seq_pos + seq_len, :] = K
-                self.v_cache[:, seq_pos:seq_pos + seq_len, :] = V
-                output = self_attention(Q=split_heads(Q), K=split_heads(self.k_cache[:, :seq_pos + seq_len, :]), V=split_heads(self.v_cache[:, :seq_pos + seq_len, :]), mask=mask)
+                self.k_cache[:, seq_pos : seq_pos + seq_len, :] = K
+                self.v_cache[:, seq_pos : seq_pos + seq_len, :] = V
+                output = self_attention(
+                    Q=split_heads(Q),
+                    K=split_heads(self.k_cache[:, : seq_pos + seq_len, :]),
+                    V=split_heads(self.v_cache[:, : seq_pos + seq_len, :]),
+                    mask=mask,
+                )
             else:
-                output = self_attention(Q=split_heads(Q), K=split_heads(K), V=split_heads(V), mask=mask)
+                output = self_attention(
+                    Q=split_heads(Q), K=split_heads(K), V=split_heads(V), mask=mask
+                )
             output = output.transpose(-2, -3).reshape(*batch_shape, seq_len, -1)
             return self.wp(output)
 
+
     @mugrade.local_tests
     class MLP(Module):
-
         def __init__(self, dim, ffn_dim):
             """
             Initialize a simple two layer feed-forward network used in the transformer block.
@@ -272,9 +325,9 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             X = self.w2(X)
             return X
 
+
     @mugrade.local_tests
     class TransformerBlock(Module):
-
         def __init__(self, dim, n_heads, ffn_dim, max_cache_size):
             """
             Initialize a transformer block with attention, normalization, and gated MLP layers.
@@ -286,7 +339,9 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
                 max_cache_size : int - maximum sequence length stored in the attention cache
             """
             super().__init__()
-            self.attn = MultiHeadAttentionKVCache(dim=dim, n_heads=n_heads, max_cache_size=max_cache_size)
+            self.attn = MultiHeadAttentionKVCache(
+                dim=dim, n_heads=n_heads, max_cache_size=max_cache_size
+            )
             self.mlp = MLP(dim=dim, ffn_dim=ffn_dim)
 
         def forward(self, X, mask=None, seq_pos=0, use_kv_cache=False):
@@ -301,9 +356,12 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             Output:
                 torch.Tensor[float] (batch_size x seq_len x dim) - transformed sequence embeddings  ### END YOUR CODE
             """
-            X = X + self.attn(rms_norm(X), mask=mask, seq_pos=seq_pos, use_kv_cache=use_kv_cache)
+            X = X + self.attn(
+                rms_norm(X), mask=mask, seq_pos=seq_pos, use_kv_cache=use_kv_cache
+            )
             X = X + self.mlp(rms_norm(X))
             return X
+
 
     @mugrade.local_tests
     def cross_entropy_loss(logits, y):
@@ -321,9 +379,9 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
         log_sum_exp = torch.logsumexp(logits, dim=-1)
         return torch.mean(-correct_logits + log_sum_exp)
 
+
     @mugrade.local_tests
     class Adam:
-
         def __init__(self, params, lr=0.001, betas=(0.9, 0.999), eps=1e-08):
             """
             Initialize Adam optimizer state for a set of parameters.
@@ -348,14 +406,16 @@ def _(Buffer, Module, Parameter, math, mugrade, torch):
             Apply one Adam update to all stored parameters.
             """
             self.t = self.t + 1
-            for (p, u, v) in zip(self.params, self.u, self.v):  ### BEGIN YOUR CODE
+            for p, u, v in zip(self.params, self.u, self.v):  ### BEGIN YOUR CODE
                 if p.grad is None:
                     continue
                 u.mul_(self.betas[0]).add_(p.grad, alpha=1 - self.betas[0])
-                v.mul_(self.betas[1]).add_(p.grad.square(), alpha=1 - self.betas[1])  ### END YOUR CODE
+                v.mul_(self.betas[1]).add_(
+                    p.grad.square(), alpha=1 - self.betas[1]
+                )  ### END YOUR CODE
                 u_hat = u / (1 - self.betas[0] ** self.t)
                 v_hat = v / (1 - self.betas[1] ** self.t)
-                p = p - self.lr * u_hat / v_hat.sqrt().add(self.eps)
+                p.sub_(self.lr * u_hat / (v_hat.sqrt() + self.eps))
 
         def zero_grad(self):
             """
@@ -417,7 +477,15 @@ def _(
             self.pos_embeddings = Parameter(torch.randn(max_seq_len, dim))
 
             self.layers = ModuleList(
-                [TransformerBlock(dim=dim, n_heads=n_heads, ffn_dim=ffn_dim, max_cache_size=max_seq_len) for _ in range(num_layers)]
+                [
+                    TransformerBlock(
+                        dim=dim,
+                        n_heads=n_heads,
+                        ffn_dim=ffn_dim,
+                        max_cache_size=max_seq_len,
+                    )
+                    for _ in range(num_layers)
+                ]
             )
 
             self.output = Linear(out_dim=num_tokens, in_dim=dim)
@@ -454,13 +522,13 @@ def _(
             ### END YOUR CODE
 
         def load_weights(self, filename):
-            """ Load a model from a Llama-like checkpoint """
-            checkpoint = torch.load(filename, map_location = self.embedding.weight.device)
+            """Load a model from a Llama-like checkpoint"""
+            checkpoint = torch.load(filename, map_location=self.embedding.weight.device)
             self.embedding.weight.data = checkpoint["tok_embeddings.weight"]
             self.pos_embeddings.data = checkpoint["pos_embeddings.weight"]
             self.output.weight.data = checkpoint["output.weight"]
 
-            for i,layer in enumerate(self.layers):
+            for i, layer in enumerate(self.layers):
                 layer.attn.wq.weight.data = checkpoint[f"layers.{i}.attention.wq.weight"]
                 layer.attn.wk.weight.data = checkpoint[f"layers.{i}.attention.wk.weight"]
                 layer.attn.wv.weight.data = checkpoint[f"layers.{i}.attention.wv.weight"]
@@ -470,19 +538,37 @@ def _(
                 layer.mlp.w2.weight.data = checkpoint[f"layers.{i}.feed_forward.w2.weight"]
 
         def save_weights(self, filename):
-            """ Save a model to a Llama-like checkpoint."""
+            """Save a model to a Llama-like checkpoint."""
             checkpoint = {}
-            checkpoint["tok_embeddings.weight"] = self.embedding.weight.detach().to(torch.bfloat16).cpu()
-            checkpoint["pos_embeddings.weight"] = self.pos_embeddings.detach().to(torch.bfloat16).cpu()
-            checkpoint["output.weight"] = self.output.weight.detach().to(torch.bfloat16).cpu()
+            checkpoint["tok_embeddings.weight"] = (
+                self.embedding.weight.detach().to(torch.bfloat16).cpu()
+            )
+            checkpoint["pos_embeddings.weight"] = (
+                self.pos_embeddings.detach().to(torch.bfloat16).cpu()
+            )
+            checkpoint["output.weight"] = (
+                self.output.weight.detach().to(torch.bfloat16).cpu()
+            )
 
             for i, layer in enumerate(self.layers):
-                checkpoint[f"layers.{i}.attention.wq.weight"] = layer.attn.wq.weight.detach().to(torch.bfloat16).cpu()
-                checkpoint[f"layers.{i}.attention.wk.weight"] = layer.attn.wk.weight.detach().to(torch.bfloat16).cpu()
-                checkpoint[f"layers.{i}.attention.wv.weight"] = layer.attn.wv.weight.detach().to(torch.bfloat16).cpu()
-                checkpoint[f"layers.{i}.attention.wo.weight"] = layer.attn.wp.weight.detach().to(torch.bfloat16).cpu()
-                checkpoint[f"layers.{i}.feed_forward.w1.weight"] = layer.mlp.w1.weight.detach().to(torch.bfloat16).cpu()
-                checkpoint[f"layers.{i}.feed_forward.w2.weight"] = layer.mlp.w2.weight.detach().to(torch.bfloat16).cpu()
+                checkpoint[f"layers.{i}.attention.wq.weight"] = (
+                    layer.attn.wq.weight.detach().to(torch.bfloat16).cpu()
+                )
+                checkpoint[f"layers.{i}.attention.wk.weight"] = (
+                    layer.attn.wk.weight.detach().to(torch.bfloat16).cpu()
+                )
+                checkpoint[f"layers.{i}.attention.wv.weight"] = (
+                    layer.attn.wv.weight.detach().to(torch.bfloat16).cpu()
+                )
+                checkpoint[f"layers.{i}.attention.wo.weight"] = (
+                    layer.attn.wp.weight.detach().to(torch.bfloat16).cpu()
+                )
+                checkpoint[f"layers.{i}.feed_forward.w1.weight"] = (
+                    layer.mlp.w1.weight.detach().to(torch.bfloat16).cpu()
+                )
+                checkpoint[f"layers.{i}.feed_forward.w2.weight"] = (
+                    layer.mlp.w2.weight.detach().to(torch.bfloat16).cpu()
+                )
             torch.save(checkpoint, filename)
 
     return (LLM,)
@@ -499,7 +585,15 @@ def _(mo):
 @app.cell
 def _(mugrade, torch):
     @mugrade.local_tests
-    def generate(model, prompt_tokens, tokenizer, eot_token=None, temp=0.7, max_tokens=500, verbose=True):
+    def generate(
+        model,
+        prompt_tokens,
+        tokenizer,
+        eot_token=None,
+        temp=0.7,
+        max_tokens=500,
+        verbose=True,
+    ):
         """
         Autoregressively sample tokens from a language model using its KV cache.
 
@@ -520,18 +614,20 @@ def _(mugrade, torch):
         inputs = torch.tensor(prompt_tokens, device=device).unsqueeze(-2)
         logits = model(inputs, seq_pos=0, use_kv_cache=True)
         logits = logits[:, -1, :]
-        token = torch.multinomial(torch.softmax(logits / temp, dim=-1), 1).item()  # add a batch size
+        token = torch.multinomial(
+            torch.softmax(logits / temp, dim=-1), 1
+        ).item()  # add a batch size
         generated_tokens.append(token)  # shape (1, num_prompt_tokens, vocab_size)
         seq_pos = seq_pos + len(prompt_tokens)
-        while len(generated_tokens) < max_tokens and token != tokenizer.eot_token:
-            inputs = torch.tensor(token).view(1, 1)
+        while len(generated_tokens) < max_tokens and token != eot_token:
+            inputs = torch.tensor(token, device=device).view(1, 1)
             logits = model(inputs, seq_pos=seq_pos, use_kv_cache=True)
             logits = logits[:, -1, :]
             token = torch.multinomial(torch.softmax(logits / temp, dim=-1), 1).item()
             generated_tokens.append(token)
             seq_pos = seq_pos + 1  # (batch_size, seq_len)
         if verbose:
-            print(tokenizer.decode(generated_tokens), end='', flush=True)
+            print(tokenizer.decode(generated_tokens), end="", flush=True)
         return generated_tokens  ### END YOUR CODE
 
     return (generate,)
@@ -551,16 +647,20 @@ def _(os):
     from huggingface_hub import hf_hub_download
 
     repo = "zkolter/Chat-Tuning-Homework"
-    filenames = ["model_base.pth",
-                 "model_chat.pth",
-                 "params.json",
-                 "ultrachat_short.json",
-                 "ultrachat_dpo_neg.json",
-                 "ultrachat_dpo_pos.json"]
+    filenames = [
+        "model_base.pth",
+        "model_chat.pth",
+        "params.json",
+        "ultrachat_short.json",
+        "ultrachat_dpo_neg.json",
+        "ultrachat_dpo_pos.json",
+    ]
 
     for filename in filenames:
         if not os.path.exists(filename):
-            hf_hub_download(repo_id=repo, filename=filename, repo_type="model", local_dir=".")
+            hf_hub_download(
+                repo_id=repo, filename=filename, repo_type="model", local_dir="."
+            )
     return
 
 
@@ -575,11 +675,11 @@ def _(LLM, json):
         params["n_heads"],
         params["max_seq_len"],
         params["ffn_dim"],
-        params["n_layers"]
+        params["n_layers"],
     )
     model.load_weights("model_base.pth")
-    model.float();
-    return (model,)
+    model.float()
+    return model, params
 
 
 @app.cell
@@ -588,7 +688,13 @@ def _(generate, model, tiktoken):
     base_tokenizer = tiktoken.get_encoding("gpt2")
     # prompt = "In a surprising discovery,"
     prompt = "Who is the president of the US?"
-    generate(model, base_tokenizer.encode(prompt,allowed_special="all"), base_tokenizer, temp=0.4, max_tokens=100);
+    generate(
+        model,
+        base_tokenizer.encode(prompt, allowed_special="all"),
+        base_tokenizer,
+        temp=0.4,
+        max_tokens=100,
+    )
     return
 
 
@@ -659,10 +765,10 @@ def _(mugrade):
         output = []
 
         for message in messages:
-            if message['role'] == "user":
+            if message["role"] == "user":
                 output.append(f"<USER>{message['content']}</USER>")
 
-            elif message['role'] == "assistant":
+            elif message["role"] == "assistant":
                 output.append(f"<ASSISTANT>{message['content']}</ASSISTANT>")
 
         return "".join(output)
@@ -702,7 +808,7 @@ def _(convert_to_chat_format, json, mugrade):
             None - writes tokenized conversations to out_filename
         """
         ### BEGIN YOUR CODE
-        with open(in_filename, 'r') as f:
+        with open(in_filename, "r") as f:
             conversations = json.load(f)
 
         tokenized_conversations = []
@@ -711,7 +817,7 @@ def _(convert_to_chat_format, json, mugrade):
             tokenized_chat = tokenizer.encode(chat_string, allowed_special="all")
             tokenized_conversations.append(tokenized_chat)
 
-        with open(out_filename, 'w') as f:
+        with open(out_filename, "w") as f:
             json.dump(tokenized_conversations, f, indent=4)
         ### END YOUR CODE
     return (pretokenize_chat,)
@@ -727,9 +833,20 @@ def _(mo):
 
 @app.cell
 def _(pretokenize_chat, tiktoken):
-    base_tokenizer_1 = tiktoken.get_encoding('gpt2')
-    tokenizer = tiktoken.Encoding(name='gpt2_chat', pat_str=base_tokenizer_1._pat_str, mergeable_ranks=base_tokenizer_1._mergeable_ranks, special_tokens={**base_tokenizer_1._special_tokens, '<USER>': 50257, '</USER>': 50258, '<ASSISTANT>': 50259, '</ASSISTANT>': 50300})
-    pretokenize_chat(tokenizer, 'ultrachat_short.json', 'ultrachat_tokenized.json')
+    base_tokenizer_1 = tiktoken.get_encoding("gpt2")
+    tokenizer = tiktoken.Encoding(
+        name="gpt2_chat",
+        pat_str=base_tokenizer_1._pat_str,
+        mergeable_ranks=base_tokenizer_1._mergeable_ranks,
+        special_tokens={
+            **base_tokenizer_1._special_tokens,
+            "<USER>": 50257,
+            "</USER>": 50258,
+            "<ASSISTANT>": 50259,
+            "</ASSISTANT>": 50300,
+        },
+    )
+    pretokenize_chat(tokenizer, "ultrachat_short.json", "ultrachat_tokenized.json")
     return (tokenizer,)
 
 
@@ -814,8 +931,7 @@ def _():
 def _(get_loss_mask, json, mugrade, torch):
     @mugrade.local_tests
     class DataLoaderChat:
-
-        def __init__(self, filename, seq_len, batch_size, tokenizer, device='cpu'):
+        def __init__(self, filename, seq_len, batch_size, tokenizer, device="cpu"):
             """
             Initialize a chat data loader backed by a tokenized json file.
 
@@ -826,7 +942,7 @@ def _(get_loss_mask, json, mugrade, torch):
                 tokenizer : object - tokenizer used to build assistant-response masks
                 device : str - device on which to place each minibatch tensor
             """  ### BEGIN YOUR CODE
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 self.data = json.load(f)
             self.seq_len = seq_len
             self.batch_size = batch_size
@@ -843,7 +959,8 @@ def _(get_loss_mask, json, mugrade, torch):
             """
             self.pos = 0
             return self
-      ### BEGIN YOUR CODE
+
+        ### BEGIN YOUR CODE
         def __next__(self):
             """
             Return the next chat minibatch with masked targets.  ### END YOUR CODE
@@ -859,22 +976,28 @@ def _(get_loss_mask, json, mugrade, torch):
             for i in range(self.batch_size):
                 tokens = self.data[self.pos + i]
                 mask = get_loss_mask(tokens, self.tokenizer)
-                x = tokens[:self.seq_len]
-                y = tokens[1:self.seq_len + 1]
-                m = mask[1:self.seq_len + 1]
+                x = tokens[: self.seq_len]
+                y = tokens[1 : self.seq_len + 1]
+                m = mask[1 : self.seq_len + 1]
                 pad_len = self.seq_len - len(x)
                 if pad_len > 0:
                     x = x + [0] * pad_len
                     y = y + [0] * pad_len
                     m = m + [False] * pad_len
                 if len(y) < self.seq_len:  # Extract up to seq_len + 1 tokens for shifting
-                    y = y + [0] * (self.seq_len - len(y))  # then slice to get x (0 to N-1) and y (1 to N)
+                    y = y + [0] * (
+                        self.seq_len - len(y)
+                    )  # then slice to get x (0 to N-1) and y (1 to N)
                     m = m + [False] * (self.seq_len - len(m))
                 batch_x.append(x)
                 batch_y.append(y)
                 batch_mask.append(m)
             self.pos = self.pos + self.batch_size
-            return (torch.tensor(batch_x, device=self.device), torch.tensor(batch_y, device=self.device), torch.tensor(batch_mask, device=self.device))  # If y was shorter because tokens ended  ### END YOUR CODE
+            return (
+                torch.tensor(batch_x, device=self.device),
+                torch.tensor(batch_y, device=self.device),
+                torch.tensor(batch_mask, device=self.device),
+            )  # If y was shorter because tokens ended  ### END YOUR CODE
 
     return (DataLoaderChat,)
 
@@ -904,7 +1027,7 @@ def _(mo):
 @app.cell
 def _(cross_entropy_loss, mugrade):
     @mugrade.local_tests
-    def train_llm_chat(model, chat_loader, opt, max_iter = None):
+    def train_llm_chat(model, chat_loader, opt, max_iter=None):
         """
         Run one pass of supervised chat finetuning with a masked next-token loss.
 
@@ -928,7 +1051,7 @@ def _(cross_entropy_loss, mugrade):
 
             opt.step()
 
-            print(f"Iteration {i+1}: Loss {loss.item()}")
+            print(f"Iteration {i + 1}: Loss {loss.item()}")
 
             if max_iter is not None and i + 1 >= max_iter:
                 break
@@ -950,15 +1073,15 @@ def _(DataLoaderChat, model, tokenizer):
     loader = DataLoaderChat("ultrachat_tokenized.json", 1024, 2, tokenizer, device="cpu")
     model.load_weights("model_base.pth")
     model.float()
-    return
+    return (loader,)
 
 
 @app.cell
-def _():
-    # print(next(model.parameters()).device)
+def _(Adam, loader, model, train_llm_chat):
+    print(next(model.parameters()).device)
 
-    # opt = Adam(model.parameters(), lr=2e-5, betas=(0.9, 0.95))
-    # train_llm_chat(model, loader, opt, max_iter=10)
+    opt = Adam(model.parameters(), lr=2e-5, betas=(0.9, 0.95))
+    train_llm_chat(model, loader, opt, max_iter=10)
     return
 
 
@@ -971,10 +1094,11 @@ def _(mo):
 
 
 @app.cell
-def _():
-    # @mugrade.local_tests
-    # def eval_llm_chat():
-    #     return model
+def _(model, mugrade):
+    @mugrade.local_tests
+    def eval_llm_chat():
+        return model
+
     return
 
 
@@ -988,16 +1112,18 @@ def _(mo):
 
 @app.cell
 def _(DataLoaderChat, model, tokenizer):
-    loader_1 = DataLoaderChat('ultrachat_tokenized.json', 1024, 32, tokenizer, device='cuda')
-    model.load_weights('model_base.pth')
+    loader_1 = DataLoaderChat("ultrachat_tokenized.json", 1024, 4, tokenizer, device="cuda")
+    model.load_weights("model_base.pth")
     model.float().cuda()  # keep in float32 format for finetuning
     return (loader_1,)
 
 
 @app.cell
 def _(Adam, loader_1, model, train_llm_chat):
-    opt = Adam(model.parameters(), lr=2e-05, betas=(0.9, 0.95))
-    train_llm_chat(model, loader_1, opt)
+    opt_1 = Adam(model.parameters(), lr=1e-05, betas=(0.9, 0.95))
+    print(opt_1.betas)
+    print(next(model.parameters()).device)
+    train_llm_chat(model, loader_1, opt_1, max_iter=2000)
     return
 
 
@@ -1011,8 +1137,44 @@ def _(mo):
 
 @app.cell
 def _(generate, model, tokenizer):
-    prompt_1 = '<USER>What is the capital of the United States?</USER><ASSISTANT>'
-    generate(model, tokenizer.encode(prompt_1, allowed_special='all'), tokenizer, eot_token=50300, temp=0.4)
+    prompt_1 = "<USER>What is the capital of the United States?</USER><ASSISTANT>"
+
+    print(f"Prompt: {prompt_1}")
+
+    response = generate(
+        model,
+        tokenizer.encode(prompt_1, allowed_special="all"),
+        tokenizer,
+        eot_token=50300,
+        temp=0.4,
+    )
+    return (prompt_1,)
+
+
+@app.cell
+def _(LLM, generate, params, prompt_1, tokenizer):
+    base_model = LLM(
+        params["num_tokens"],
+        params["dim"],
+        params["n_heads"],
+        params["max_seq_len"],
+        params["ffn_dim"],
+        params["n_layers"],
+    )
+    base_model.load_weights("model_base.pth")
+    base_model.float()
+
+
+    print(f"Prompt: {prompt_1}")
+
+    _ = generate(
+        base_model,
+        tokenizer.encode(prompt_1, allowed_special="all"),
+        tokenizer,
+        eot_token=50300,
+        temp=0.4,
+        # verbose=False,
+    )
     return
 
 
@@ -1102,7 +1264,7 @@ def _(mugrade):
 @app.cell
 def _(mugrade):
     @mugrade.local_tests
-    def dpo_loss(model, model_ref, xp,yp,maskp, xn, yn, maskn, beta):
+    def dpo_loss(model, model_ref, xp, yp, maskp, xn, yn, maskn, beta):
         """
         Compute the DPO loss for paired preferred and dispreferred completions.
 
@@ -1154,7 +1316,7 @@ def _(mo):
 @app.cell
 def _(mugrade):
     @mugrade.local_tests
-    def train_dpo(model, model_ref, loader_pos, loader_neg, opt, beta=0.1, max_iter = None):
+    def train_dpo(model, model_ref, loader_pos, loader_neg, opt, beta=0.1, max_iter=None):
         """
         Run one pass of DPO finetuning over paired positive and negative minibatches.
 
@@ -1187,21 +1349,25 @@ def _(mo):
 
 @app.cell
 def _(DataLoaderChat, copy, model, tokenizer):
-    loader_neg = DataLoaderChat("ultrachat_neg_tokenized.json", 1024, 2, tokenizer, device="cpu")
-    loader_pos = DataLoaderChat("ultrachat_pos_tokenized.json", 1024, 2, tokenizer, device="cpu")
-    model.load_weights("model_chat.pth") # comment out if you want to use your own model
-    model.float().cpu();
+    loader_neg = DataLoaderChat(
+        "ultrachat_neg_tokenized.json", 1024, 2, tokenizer, device="cpu"
+    )
+    loader_pos = DataLoaderChat(
+        "ultrachat_pos_tokenized.json", 1024, 2, tokenizer, device="cpu"
+    )
+    model.load_weights("model_chat.pth")  # comment out if you want to use your own model
+    model.float().cpu()
     # shallow copy shares structure
     model_ref = copy.copy(model)
     model_ref.load_state_dict(copy.deepcopy(model.state_dict()))
-    model_ref = model_ref.cpu().float();
+    model_ref = model_ref.cpu().float()
     return loader_neg, loader_pos, model_ref
 
 
 @app.cell
 def _(Adam, loader_neg, loader_pos, model, model_ref, train_dpo):
-    opt_1 = Adam(model.parameters(), lr=1e-06, betas=(0.9, 0.95))
-    train_dpo(model, model_ref, loader_pos, loader_neg, opt_1, max_iter=10)
+    opt_2 = Adam(model.parameters(), lr=1e-06, betas=(0.9, 0.95))
+    train_dpo(model, model_ref, loader_pos, loader_neg, opt_2, max_iter=10)
     return
 
 
@@ -1233,9 +1399,13 @@ def _(mo):
 @app.cell
 def _(DataLoaderChat, copy, model, tokenizer):
     ### Set up data loaders for large DPO run
-    loader_neg_1 = DataLoaderChat('ultrachat_neg_tokenized.json', 1024, 16, tokenizer, device='cuda')
-    loader_pos_1 = DataLoaderChat('ultrachat_pos_tokenized.json', 1024, 16, tokenizer, device='cuda')
-    model.load_weights('model_chat.pth')  # comment out if you want to use your own model
+    loader_neg_1 = DataLoaderChat(
+        "ultrachat_neg_tokenized.json", 1024, 16, tokenizer, device="cuda"
+    )
+    loader_pos_1 = DataLoaderChat(
+        "ultrachat_pos_tokenized.json", 1024, 16, tokenizer, device="cuda"
+    )
+    model.load_weights("model_chat.pth")  # comment out if you want to use your own model
     model.float().cuda()
     model_ref_1 = copy.deepcopy(model)
     return loader_neg_1, loader_pos_1, model_ref_1
@@ -1244,16 +1414,22 @@ def _(DataLoaderChat, copy, model, tokenizer):
 @app.cell
 def _(Adam, loader_neg_1, loader_pos_1, model, model_ref_1, train_dpo):
     ### Train DPO
-    opt_2 = Adam(model.parameters(), lr=1e-06, betas=(0.9, 0.95))
-    train_dpo(model, model_ref_1, loader_pos_1, loader_neg_1, opt_2)
+    opt_3 = Adam(model.parameters(), lr=1e-06, betas=(0.9, 0.95))
+    train_dpo(model, model_ref_1, loader_pos_1, loader_neg_1, opt_3)
     return
 
 
 @app.cell
 def _(generate, model, tokenizer):
     ### Test some prompt generation
-    prompt_2 = '<USER>Write a poem about flowers.</USER><ASSISTANT>'
-    generate(model, tokenizer.encode(prompt_2, allowed_special='all'), tokenizer, eot_token=50300, temp=0.4)
+    prompt_2 = "<USER>Write a poem about flowers.</USER><ASSISTANT>"
+    generate(
+        model,
+        tokenizer.encode(prompt_2, allowed_special="all"),
+        tokenizer,
+        eot_token=50300,
+        temp=0.4,
+    )
     return
 
 
