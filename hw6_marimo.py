@@ -37,14 +37,6 @@ def _():
     return (subprocess,)
 
 
-@app.cell
-def _():
-    import sys
-
-    print(sys.version)
-    return
-
-
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
@@ -116,13 +108,15 @@ def _(subprocess):
     from torch.nn import Buffer, Module, ModuleList, Parameter
 
     os.environ["MUGRADE_HW"] = "Homework 6"
-    os.environ["MUGRADE_KEY"] = ""  ### Your key here
+    # os.environ["MUGRADE_KEY"] = ""  ### Your key here
+
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
     return (
         Buffer,
         Module,
         ModuleList,
         Parameter,
-        copy,
         json,
         math,
         mugrade,
@@ -751,7 +745,7 @@ def _(mo):
 
 @app.cell
 def _(mugrade):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     def convert_to_chat_format(messages):
         """
         Convert a list of chat messages into a single tagged text string.
@@ -795,7 +789,7 @@ def _(mo):
 
 @app.cell
 def _(convert_to_chat_format, json, mugrade):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     def pretokenize_chat(tokenizer, in_filename, out_filename):
         """
         Convert a chat dataset from json conversations to json token lists.
@@ -872,7 +866,7 @@ def _(tokenizer):
 
 @app.cell
 def _(mugrade):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     def get_loss_mask(tokens, tokenizer):
         """
         Build a boolean mask selecting assistant-response tokens for training.
@@ -929,7 +923,7 @@ def _():
 
 @app.cell
 def _(get_loss_mask, json, mugrade, torch):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     class DataLoaderChat:
         def __init__(self, filename, seq_len, batch_size, tokenizer, device="cpu"):
             """
@@ -1026,7 +1020,7 @@ def _(mo):
 
 @app.cell
 def _(cross_entropy_loss, mugrade):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     def train_llm_chat(model, chat_loader, opt, max_iter=None):
         """
         Run one pass of supervised chat finetuning with a masked next-token loss.
@@ -1095,7 +1089,7 @@ def _(mo):
 
 @app.cell
 def _(model, mugrade):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     def eval_llm_chat():
         return model
 
@@ -1123,7 +1117,7 @@ def _(Adam, loader_1, model, train_llm_chat):
     opt_1 = Adam(model.parameters(), lr=1e-05, betas=(0.9, 0.95))
     print(opt_1.betas)
     print(next(model.parameters()).device)
-    train_llm_chat(model, loader_1, opt_1, max_iter=2000)
+    train_llm_chat(model, loader_1, opt_1, max_iter=20)
     return
 
 
@@ -1164,7 +1158,6 @@ def _(LLM, generate, params, prompt_1, tokenizer):
     base_model.load_weights("model_base.pth")
     base_model.float()
 
-
     print(f"Prompt: {prompt_1}")
 
     _ = generate(
@@ -1201,8 +1194,8 @@ def _(mo):
 
 
 @app.cell
-def _(mugrade):
-    @mugrade.local_tests
+def _(mugrade, torch):
+    @mugrade.submit_tests
     def log_probs(logits, y, mask):
         """
         Compute masked sequence log probabilities for each batch element.
@@ -1215,9 +1208,15 @@ def _(mugrade):
             torch.Tensor[float] (batch_size,) - summed masked log probabilities per example
         """
         ### BEGIN YOUR CODE
-        pass
+        logits_correct = torch.gather(input=logits, dim=-1, index=y.unsqueeze(-1)).squeeze(
+            -1
+        )
+
+        log_probs = logits_correct - torch.logsumexp(logits, dim=-1)
+
+        return (log_probs * mask).sum(dim=-1)
         ### END YOUR CODE
-    return
+    return (log_probs,)
 
 
 @app.cell(hide_code=True)
@@ -1243,8 +1242,8 @@ def _(mo):
 
 
 @app.cell
-def _(mugrade):
-    @mugrade.local_tests
+def _(mugrade, torch):
+    @mugrade.submit_tests
     def softplus(x, beta):
         """
         Compute the beta-scaled softplus function elementwise.
@@ -1256,14 +1255,17 @@ def _(mugrade):
             torch.Tensor[float] (...) - softplus(beta * x)
         """
         ### BEGIN YOUR CODE
-        pass
+        return torch.logaddexp(
+            beta * x,
+            torch.zeros_like(x),
+        )
         ### END YOUR CODE
-    return
+    return (softplus,)
 
 
 @app.cell
-def _(mugrade):
-    @mugrade.local_tests
+def _(log_probs, mugrade, softplus, torch):
+    @mugrade.submit_tests
     def dpo_loss(model, model_ref, xp, yp, maskp, xn, yn, maskn, beta):
         """
         Compute the DPO loss for paired preferred and dispreferred completions.
@@ -1282,9 +1284,16 @@ def _(mugrade):
             torch.Tensor[float] (batch_size,) - DPO loss for each preference pair
         """
         ### BEGIN YOUR CODE
-        pass
+        diff1 = -log_probs(model(xp), yp, maskp) + log_probs(model(xn), yn, maskn)
+
+        with torch.no_grad():
+            diff2 = log_probs(model_ref(xp), yp, maskp) - log_probs(
+                model_ref(xn), yn, maskn
+            )
+
+        return softplus(diff1 + diff2, beta)
         ### END YOUR CODE
-    return
+    return (dpo_loss,)
 
 
 @app.cell(hide_code=True)
@@ -1314,8 +1323,8 @@ def _(mo):
 
 
 @app.cell
-def _(mugrade):
-    @mugrade.local_tests
+def _(dpo_loss, mugrade):
+    @mugrade.submit_tests
     def train_dpo(model, model_ref, loader_pos, loader_neg, opt, beta=0.1, max_iter=None):
         """
         Run one pass of DPO finetuning over paired positive and negative minibatches.
@@ -1332,7 +1341,19 @@ def _(mugrade):
             None - updates model parameters in place
         """
         ### BEGIN YOUR CODE
-        pass
+        for i, ((xp, yp, maskp), (xn, yn, maskn)) in enumerate(zip(loader_pos, loader_neg)):
+            opt.zero_grad()
+
+            loss = dpo_loss(model, model_ref, xp, yp, maskp, xn, yn, maskn, beta)
+            loss = loss.mean()
+            loss.backward()
+
+            opt.step()
+
+            print(f"Iteration {i + 1}: Loss {loss.item()}")
+
+            if max_iter and i + 1 >= max_iter:
+                break
         ### END YOUR CODE
     return (train_dpo,)
 
@@ -1348,7 +1369,7 @@ def _(mo):
 
 
 @app.cell
-def _(DataLoaderChat, copy, model, tokenizer):
+def _(DataLoaderChat, LLM, model, params, tokenizer):
     loader_neg = DataLoaderChat(
         "ultrachat_neg_tokenized.json", 1024, 2, tokenizer, device="cpu"
     )
@@ -1357,16 +1378,23 @@ def _(DataLoaderChat, copy, model, tokenizer):
     )
     model.load_weights("model_chat.pth")  # comment out if you want to use your own model
     model.float().cpu()
-    # shallow copy shares structure
-    model_ref = copy.copy(model)
-    model_ref.load_state_dict(copy.deepcopy(model.state_dict()))
-    model_ref = model_ref.cpu().float()
+
+    model_ref = LLM(
+        params["num_tokens"],
+        params["dim"],
+        params["n_heads"],
+        params["max_seq_len"],
+        params["ffn_dim"],
+        params["n_layers"],
+    )
+    model_ref.load_weights("model_chat.pth")
+    model_ref.float().cpu()
     return loader_neg, loader_pos, model_ref
 
 
 @app.cell
 def _(Adam, loader_neg, loader_pos, model, model_ref, train_dpo):
-    opt_2 = Adam(model.parameters(), lr=1e-06, betas=(0.9, 0.95))
+    opt_2 = Adam(model.parameters(), lr=1e-05, betas=(0.9, 0.95))
     train_dpo(model, model_ref, loader_pos, loader_neg, opt_2, max_iter=10)
     return
 
@@ -1381,7 +1409,7 @@ def _(mo):
 
 @app.cell
 def _(model, mugrade):
-    @mugrade.local_tests
+    @mugrade.submit_tests
     def eval_llm_dpo():
         return model
 
@@ -1397,25 +1425,26 @@ def _(mo):
 
 
 @app.cell
-def _(DataLoaderChat, copy, model, tokenizer):
+def _(DataLoaderChat, model, model_ref, tokenizer):
     ### Set up data loaders for large DPO run
     loader_neg_1 = DataLoaderChat(
-        "ultrachat_neg_tokenized.json", 1024, 16, tokenizer, device="cuda"
+        "ultrachat_neg_tokenized.json", 1024, 2, tokenizer, device="cuda"
     )
     loader_pos_1 = DataLoaderChat(
-        "ultrachat_pos_tokenized.json", 1024, 16, tokenizer, device="cuda"
+        "ultrachat_pos_tokenized.json", 1024, 2, tokenizer, device="cuda"
     )
     model.load_weights("model_chat.pth")  # comment out if you want to use your own model
     model.float().cuda()
-    model_ref_1 = copy.deepcopy(model)
-    return loader_neg_1, loader_pos_1, model_ref_1
+
+    model_ref.float().cuda()
+    return loader_neg_1, loader_pos_1
 
 
 @app.cell
-def _(Adam, loader_neg_1, loader_pos_1, model, model_ref_1, train_dpo):
+def _(Adam, loader_neg_1, loader_pos_1, model, model_ref, train_dpo):
     ### Train DPO
-    opt_3 = Adam(model.parameters(), lr=1e-06, betas=(0.9, 0.95))
-    train_dpo(model, model_ref_1, loader_pos_1, loader_neg_1, opt_3)
+    opt_3 = Adam(model.parameters(), lr=1e-05, betas=(0.9, 0.95))
+    train_dpo(model, model_ref, loader_pos_1, loader_neg_1, opt_3, max_iter=1000)
     return
 
 
@@ -1423,13 +1452,36 @@ def _(Adam, loader_neg_1, loader_pos_1, model, model_ref_1, train_dpo):
 def _(generate, model, tokenizer):
     ### Test some prompt generation
     prompt_2 = "<USER>Write a poem about flowers.</USER><ASSISTANT>"
-    generate(
+
+    response2 = generate(
         model,
         tokenizer.encode(prompt_2, allowed_special="all"),
         tokenizer,
         eot_token=50300,
         temp=0.4,
     )
+    return (prompt_2,)
+
+
+@app.cell
+def _(generate, model_ref, prompt_2, tokenizer):
+    response3 = generate(
+        model_ref,
+        tokenizer.encode(prompt_2, allowed_special="all"),
+        tokenizer,
+        eot_token=50300,
+        temp=0.4,
+    )
+    return
+
+
+@app.cell
+def _():
+    return
+
+
+@app.cell
+def _():
     return
 
 
